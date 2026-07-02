@@ -1,0 +1,16 @@
+{
+  "name": "web-skill-demo",
+  "private": true,
+  "workspaces": [
+    "mother-app",
+    "sub-apps/*"
+  ],
+  "scripts": {
+    "dev:mother": "npm run dev -w mother-app",
+    "dev:skill1": "npm run dev -w sub-apps/skill1-sso",
+    "dev:skill2": "npm run dev -w sub-apps/skill2-iframe-tab",
+    "dev:skill2-1": "npm run dev -w sub-apps/skill2-1-iframe-auth",
+    "dev:skill3": "npm run dev -w sub-apps/skill3-web-component",
+    "dev:skill3-1": "npm run dev -w sub-apps/skill3-1-web-component-auth"
+  }
+}

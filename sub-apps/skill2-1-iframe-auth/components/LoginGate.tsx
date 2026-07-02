@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { PORTAL_ORIGIN } from "@/lib/config";
 
-// 로그인 전 화면.
-// - 직접 접속: "중앙 SSO로 로그인" 버튼 (standalone-sso 흐름)
+// Skill 2-1의 핵심 컴포넌트.
+// - 직접 접속: "중앙 SSO로 로그인" 버튼 (Skill 1과 동일한 흐름)
 // - iframe 내부: 먼저 silent SSO를 자동 시도(same-sso). SSO 세션이 없어
 //   실패(?login=required)하면 부모(Mother App)에게 LOGIN_REQUIRED postMessage.
 export function LoginGate() {
@@ -52,8 +52,8 @@ export function LoginGate() {
         ) : (
           <>
             <p>
-              로그인되어 있지 않습니다. 이 앱은 <b>standalone-sso</b> Skill을
-              제공하므로 직접 접속 시 중앙 SSO로 로그인합니다.
+              로그인되어 있지 않습니다. 직접 접속 시에는 중앙 SSO로
+              로그인합니다.
             </p>
             <a className="btn" href="/auth/login">
               중앙 SSO로 로그인

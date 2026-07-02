@@ -1,5 +1,4 @@
 // Skill 3 데모: 인증 통합이 필요 없는 공개 Web Component 위젯.
-// Factory KPI 앱(가상)이 호스팅한다고 가정하고 FastAPI 정적 경로에서 서빙된다.
 class FactoryKpiCard extends HTMLElement {
   static get observedAttributes() {
     return ["plant"];

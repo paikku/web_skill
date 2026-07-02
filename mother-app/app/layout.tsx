@@ -15,6 +15,14 @@ export default async function RootLayout({
   const tabApps = MANIFESTS.filter(
     (m) => m.iframeTab?.enabled && m.status !== "disabled"
   );
+  // sso Skill만 있는 앱은 탭이 아니라 직접 접속 링크로만 노출한다
+  const ssoOnlyApps = MANIFESTS.filter(
+    (m) =>
+      m.sso?.enabled &&
+      !m.iframeTab?.enabled &&
+      m.status !== "disabled" &&
+      m.sso.redirectUris?.length
+  );
 
   return (
     <html lang="ko">
@@ -27,6 +35,16 @@ export default async function RootLayout({
               <Link key={app.appId} href={`/apps/${app.appId}`}>
                 {app.iframeTab?.title ?? app.appName}
               </Link>
+            ))}
+            {ssoOnlyApps.map((app) => (
+              <a
+                key={app.appId}
+                href={new URL(app.sso!.redirectUris![0]).origin}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {app.appName} ↗
+              </a>
             ))}
             <Link href="/skills">Skill Matrix</Link>
           </nav>

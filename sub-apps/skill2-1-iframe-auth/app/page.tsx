@@ -5,8 +5,6 @@ import { ProjectsApp } from "@/components/ProjectsApp";
 
 type Project = { id: number; title: string; saving: number; owner: string };
 
-// 직접 접속 흐름 (standalone-sso):
-// 1. 로그인 상태 확인 → 2. 없으면 중앙 SSO redirect → 3. callback 복귀 → 4. 화면 표시
 export default async function Page() {
   const user = await getUser();
 

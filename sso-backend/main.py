@@ -1,12 +1,12 @@
 """
-가짜 중앙 SSO + Sub App(원가절감) 업무 API + Legacy Report + 공개 위젯 호스팅.
+가짜 중앙 SSO + Sub App(원가절감) 업무 API.
 
-하나의 FastAPI 프로세스가 데모 편의상 4개 역할을 겸한다.
+하나의 FastAPI 프로세스가 데모 편의상 2개 역할을 겸한다.
 
-  1. 중앙 SSO (OIDC 흉내)  : /authorize /token /userinfo /logout
-  2. 원가절감 업무 API      : /api/cost-saving/*  (Bearer 검증 + 기능별 권한 체크)
-  3. Legacy Report 앱      : /legacy-report      (인증 통합 없는 iframeTab 데모)
-  4. Factory KPI 위젯 호스팅: /widgets/kpi-card.js (인증 없는 webComponents 데모)
+  1. 중앙 SSO (OIDC 흉내) : /authorize /token /userinfo /logout
+  2. 원가절감 업무 API     : /api/cost-saving/*  (Bearer 검증 + 기능별 권한 체크)
+
+화면(iframe 탭)과 위젯 호스팅은 각 Sub App(Next.js)이 담당한다 — sub-apps/ 참고.
 """
 
 import secrets
@@ -16,22 +16,18 @@ from urllib.parse import urlencode
 from fastapi import FastAPI, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Fake Central SSO + Sub App Backend")
 
 PORTAL_ORIGIN = "http://localhost:3000"
-SUB_APP_ORIGIN = "http://localhost:3001"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[PORTAL_ORIGIN, SUB_APP_ORIGIN],
+    allow_origins=[PORTAL_ORIGIN],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.mount("/widgets", StaticFiles(directory="widgets"), name="widgets")
 
 # ---------------------------------------------------------------------------
 # 데모 데이터 (전부 in-memory)
@@ -62,7 +58,8 @@ COST_SAVING_PERMISSIONS = {
 
 REGISTERED_CLIENTS = {
     "mother-portal": {"redirect_uris": ["http://localhost:3000/auth/callback"]},
-    "cost-saving-app": {"redirect_uris": ["http://localhost:3001/auth/callback"]},
+    "expense-app": {"redirect_uris": ["http://localhost:3001/auth/callback"]},
+    "cost-saving-app": {"redirect_uris": ["http://localhost:3003/auth/callback"]},
 }
 
 PROJECTS = [
@@ -305,44 +302,3 @@ def my_permissions(request: Request):
     if err:
         return err
     return {"userId": user["sub"], "permissions": COST_SAVING_PERMISSIONS.get(user["sub"], [])}
-
-
-# ---------------------------------------------------------------------------
-# 3. Legacy Report (인증 통합 없는 iframeTab 데모용 정적 앱)
-# ---------------------------------------------------------------------------
-
-LEGACY_REPORT_PAGE = """
-<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <title>Legacy Report</title>
-  <style>
-    body { font-family: sans-serif; background: #fdf6e3; color: #333; padding: 24px; }
-    h1 { font-size: 20px; }
-    .badge { background: #b58900; color: #fff; padding: 2px 8px; border-radius: 4px;
-             font-size: 12px; }
-    table { border-collapse: collapse; margin-top: 16px; width: 100%; max-width: 560px; }
-    th, td { border: 1px solid #ccc; padding: 8px 12px; font-size: 14px; text-align: left; }
-    th { background: #eee8d5; }
-    p { font-size: 13px; color: #666; }
-  </style>
-</head>
-<body>
-  <h1>📊 Legacy Report <span class="badge">iframeTab only · 인증 통합 없음</span></h1>
-  <p>이 화면은 FastAPI가 서빙하는 옛날 앱입니다. Mother App 로그인과 무관하게 항상 보입니다.<br/>
-     Manifest에 <code>iframeTab</code> Skill만 선언한 케이스입니다.</p>
-  <table>
-    <tr><th>월</th><th>생산량</th><th>불량률</th></tr>
-    <tr><td>2026-04</td><td>12,400</td><td>0.8%</td></tr>
-    <tr><td>2026-05</td><td>13,100</td><td>0.6%</td></tr>
-    <tr><td>2026-06</td><td>12,900</td><td>0.7%</td></tr>
-  </table>
-</body>
-</html>
-"""
-
-
-@app.get("/legacy-report")
-def legacy_report():
-    return HTMLResponse(LEGACY_REPORT_PAGE)

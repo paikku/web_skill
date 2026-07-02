@@ -1,10 +1,10 @@
 {
-  "name": "sub-app-cost-saving",
+  "name": "skill3-1-web-component-auth",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "next dev -p 3005",
     "build": "next build",
-    "start": "next start -p 3001"
+    "start": "next start -p 3005"
   },
   "dependencies": {
     "next": "^15.5.20",

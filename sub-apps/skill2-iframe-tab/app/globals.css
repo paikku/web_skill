@@ -1,0 +1,37 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  background: #fdf6e3;
+  color: #333;
+  padding: 24px;
+}
+
+h1 { font-size: 20px; }
+
+.badge {
+  background: #b58900;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+table {
+  border-collapse: collapse;
+  margin-top: 16px;
+  width: 100%;
+  max-width: 560px;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px 12px;
+  font-size: 14px;
+  text-align: left;
+}
+
+th { background: #eee8d5; }
+
+p { font-size: 13px; color: #666; }
