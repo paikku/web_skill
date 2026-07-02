@@ -14,7 +14,8 @@ let allUp = true;
 
 for (const [url, name, howToRun] of SERVERS) {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    // dev 서버 첫 요청은 컴파일 때문에 수 초 걸릴 수 있다
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
     console.log(`✅ ${name} — ${url} (HTTP ${res.status})`);
   } catch {
     allUp = false;
