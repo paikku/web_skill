@@ -35,16 +35,45 @@ Mother App의 `lib/manifests.ts`에 5개 앱의 Manifest가 등록되어 있고,
 Next.js 앱 6개는 npm workspaces로 node_modules를 공유합니다.
 
 ```bash
-# 1. 의존성 설치 (repo 루트에서 한 번)
+# 1. 의존성 설치 (example/ 에서 한 번)
 npm install
-pip install -r sso-backend/requirements.txt
+pip install -r sso-backend/requirements.txt   # Python 3.9+
 
 # 2. 전체 실행
-./run-all.sh
+./run-all.sh        # WSL / macOS / Linux
+# Windows PowerShell이라면: .\run-all.ps1  (서버별 새 창 7개)
+
+# 3. 서버 7개가 전부 떴는지 확인
+npm run check
 ```
 
 개별 실행: `npm run dev:mother`, `dev:skill1`, `dev:skill2`, `dev:skill2-1`,
-`dev:skill3`, `dev:skill3-1` + `uvicorn main:app --port 8000` (sso-backend).
+`dev:skill3`, `dev:skill3-1` +
+`python -m uvicorn main:app --host 0.0.0.0 --port 8000` (sso-backend에서).
+
+### 안 될 때 (특히 "로그인 눌렀더니 사이트에 연결할 수 없음")
+
+로그인 버튼은 `localhost:8000`(가짜 SSO)으로 redirect합니다. 포털(:3000)은
+뜨는데 로그인만 연결 오류가 나면 **:8000이 안 떠 있거나 접근이 안 되는 것**입니다.
+
+1. `npm run check` — 죽어 있는 서버와 실행 명령을 알려줍니다.
+2. SSO 서버는 반드시 `--host 0.0.0.0`으로 띄우세요. **WSL2에서 Windows
+   브라우저로 접속하는 경우** 127.0.0.1에만 바인딩된 서버는 localhost 포워딩이
+   안 될 수 있습니다 (run-all.sh에 이미 반영됨).
+3. `uvicorn` 명령을 못 찾으면 `python -m uvicorn ...` 또는 `python3 -m uvicorn ...`.
+4. Python 3.9 이하면 `pip install` / import 에러가 날 수 있습니다 — 3.10+ 권장.
+5. 그래도 WSL2 localhost 포워딩이 안 되면 `wsl --shutdown` 후 재시작하거나,
+   WSL 안에서 `hostname -I`로 나온 IP로 접속해보세요 (이 경우 SSO redirect가
+   localhost 기준이라 데모는 localhost 포워딩 복구를 권장).
+
+### 자동 검증 (e2e)
+
+서버 7개를 띄운 뒤 13개 시나리오를 헤드리스 브라우저로 검증할 수 있습니다:
+
+```bash
+npm i --no-save playwright && npx playwright install chromium   # 최초 1회
+npm run e2e     # 스크린샷: e2e/shots/
+```
 
 ## 데모 사용자
 

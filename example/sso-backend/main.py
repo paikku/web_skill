@@ -9,6 +9,8 @@
 화면(iframe 탭)과 위젯 호스팅은 각 Sub App(Next.js)이 담당한다 — sub-apps/ 참고.
 """
 
+from __future__ import annotations  # Python 3.10 미만에서도 `dict | None` 표기 허용
+
 import secrets
 import time
 from urllib.parse import urlencode
