@@ -1,6 +1,7 @@
 # Optional Integration Skills 데모
 
-`mother-app-integration-skills.md` / `sub-app-integration-skills.md` 문서의 5가지 Integration Skill을
+루트의 [`mother-app-integration-skills.md`](../mother-app-integration-skills.md) /
+[`sub-app-integration-skills.md`](../sub-app-integration-skills.md) 문서의 5가지 Integration Skill을
 **옵션별로 분리된 Sub App**으로 체감할 수 있는 최소 구현 데모입니다.
 
 ## 구성 — 옵션당 Sub App 1개
