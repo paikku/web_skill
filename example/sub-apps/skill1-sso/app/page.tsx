@@ -1,4 +1,5 @@
 import { getUser } from "@/lib/auth";
+import { ExpenseList } from "@/components/ExpenseList";
 
 // Skill 1 (standalone-sso) 직접 접속 흐름:
 // 1. 로그인 상태 확인 → 2. 없으면 중앙 SSO redirect → 3. callback 복귀 → 4. 화면 표시
@@ -37,10 +38,12 @@ export default async function Page() {
         </tbody>
       </table>
       <p>
-        Token에는 identity만 담겨 있습니다. 기능별 권한이 필요하면 각 Sub App
-        DB에서 조회합니다 (문서 11장 Token 정책).
+        Token에는 identity만 담겨 있습니다. 아래 경비 내역은 SSO가 아니라
+        <b> 이 앱의 자체 API(/api/expenses)</b>에서 가져온 데이터입니다.
       </p>
-      <a className="btn ghost" href="/auth/logout">
+      <h2 style={{ fontSize: 15 }}>내 경비 내역 (자체 API)</h2>
+      <ExpenseList />
+      <a className="btn ghost" href="/auth/logout" style={{ marginTop: 12 }}>
         로그아웃
       </a>
     </div>

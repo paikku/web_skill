@@ -8,8 +8,8 @@
 
 | 디렉터리 | Skill | 가상 앱 | 포트 |
 |---|---|---|---|
-| `sso-backend/` | (공용) 가짜 중앙 SSO + 원가절감 업무 API | — | 8000 |
-| `mother-app/` | (공용) Mother App Portal | — | 3000 |
+| `sso-backend/` | (공용) 가짜 중앙 SSO — **인증(identity)만** | — | 8000 |
+| `mother-app/` | (공용) Mother App Portal + 인증 브릿지(BFF) | — | 3000 |
 | `sub-apps/skill1-sso/` | **1. SSO 인증** | 출장경비 | 3001 |
 | `sub-apps/skill2-iframe-tab/` | **2. iframe 탭 제공** | Legacy Report | 3002 |
 | `sub-apps/skill2-1-iframe-auth/` | **2-1. iframe 인증 통합** (same-sso + postMessage) | 원가절감 | 3003 |
@@ -21,14 +21,29 @@
 
 ```text
 skill2-iframe-tab/          화면 1장, 인증 코드 0줄
-skill1-sso/                 + auth/login·callback·logout (SSO 코드의 최소 단위)
-skill2-1-iframe-auth/       + silent 로그인, LOGIN_REQUIRED postMessage, auth/session
-skill3-web-component/       위젯 js 1개 + CORS 헤더, 인증 코드 0줄
-skill3-1-web-component-auth/ 위젯 js 2개 (bff / portal-auth-bridge) — token은 안 만짐
+skill1-sso/                 + auth/login·callback·logout + 자기 API(/api/expenses)
+skill2-1-iframe-auth/       + silent 로그인, LOGIN_REQUIRED postMessage, auth/session,
+                             자기 API(/api/projects)와 권한(lib/data)
+skill3-web-component/       React 위젯 + 래퍼 + esbuild + 자기 API(/api/kpi), 인증 0줄
+skill3-1-web-component-auth/ React 위젯 2개(bff/bridge) + 자기 API(/api/projects) — token 안 만짐
 ```
 
 Mother App의 `lib/manifests.ts`에 5개 앱의 Manifest가 등록되어 있고,
 `/skills` 페이지(Skill Matrix)에서 앱별 선언 Skill을 한눈에 볼 수 있습니다.
+
+### 이번 구조의 핵심 원칙 3가지
+
+1. **SSO는 인증만.** `sso-backend`는 `/authorize /token /userinfo /logout`만 제공합니다.
+   업무 데이터(경비/과제/KPI)와 기능별 권한은 각 Sub App이 **자기 API**로 소유·검증합니다.
+   Sub App은 발급받은 토큰을 SSO `/userinfo`로 introspection 해 사용자만 확인합니다.
+2. **Web Component는 React + 래퍼.** 위젯은 React로 작성하고
+   `reactToWebComponent`가 Custom Element(Shadow DOM)로 감쌉니다. esbuild가 React까지
+   self-contained 번들로 묶어 Mother App과 런타임을 공유하지 않습니다(강결합 방지).
+   위젯 내부를 바꿔도 Mother의 `WebComponentRenderer`는 손대지 않습니다.
+3. **Mother App은 인증 브릿지.** 위젯의 데이터 요청은 `/bff/{appId}/...`(제네릭)를 통해
+   포털 토큰을 붙여 해당 Sub App의 자기 API로 프록시할 뿐, 데이터는 가공하지 않습니다.
+
+각 앱의 **구현 방식**은 해당 `sub-apps/*/README.md`에 자세히 설명되어 있습니다.
 
 ## 실행
 
@@ -68,7 +83,7 @@ npm run check
 
 ### 자동 검증 (e2e)
 
-서버 7개를 띄운 뒤 13개 시나리오를 헤드리스 브라우저로 검증할 수 있습니다:
+서버 7개를 띄운 뒤 14개 시나리오를 헤드리스 브라우저로 검증할 수 있습니다:
 
 ```bash
 npm i --no-save playwright && npx playwright install chromium   # 최초 1회
@@ -82,13 +97,15 @@ npm run e2e     # 스크린샷: e2e/shots/
 | 김철수 | `COST_SAVING_VIEW` + `COST_SAVING_EDIT` | 과제 조회 + 등록 가능 |
 | 이영희 | `COST_SAVING_VIEW` | 조회만 가능 — 등록 시 backend가 **403** 반환 |
 
-토큰에는 identity만 담고, 기능 권한은 Sub App backend(가짜 DB)가 관리합니다 (문서 11장 Token 정책).
+토큰에는 identity만 담고, 기능 권한은 **각 Sub App이 자기 API에서** 관리합니다 (문서 11장 Token 정책).
+권한/과제 데이터는 `skill2-1`, `skill3-1`이 각자 `lib/data.ts`에 소유하므로, 두 원가절감
+데모 앱의 저장소는 독립적입니다(같은 seed).
 
 ## 각 Skill 체감 시나리오
 
 ### Skill 1 — SSO 인증 (`sub-apps/skill1-sso`, :3001)
 
-1. `http://localhost:3001` 직접 접속 → "중앙 SSO로 로그인" → 가짜 SSO에서 사용자 선택 → callback 복귀 → identity 표시
+1. `http://localhost:3001` 직접 접속 → "중앙 SSO로 로그인" → 가짜 SSO에서 사용자 선택 → callback 복귀 → identity + **자기 API(/api/expenses) 경비 내역** 표시
 2. 포털에서 이미 로그인했다면 SSO 세션이 재사용되어 **로그인 화면 없이 즉시 통과**
 
 ### Skill 2 — iframe 탭 (`sub-apps/skill2-iframe-tab`, :3002)
@@ -105,14 +122,15 @@ npm run e2e     # 스크린샷: e2e/shots/
 
 ### Skill 3 — Web Component (`sub-apps/skill3-web-component`, :3004)
 
-1. 포털 홈 대시보드의 **공장 KPI** 위젯 — 로그인 전에도 항상 표시
-2. `scriptUrl`은 Mother App의 allowlist 검증 후에만 로드
+1. 포털 홈 대시보드의 **공장 KPI** 위젯(React) — 로그인 전에도 항상 표시
+2. 위젯은 자기 API `/api/kpi`에서 데이터를 그림. `scriptUrl`은 Mother App allowlist 검증 후 로드
+3. Shadow DOM + esbuild 번들이라 Mother App과 스타일/React 런타임을 공유하지 않음
 
 ### Skill 3-1 — Web Component 인증 통합 (`sub-apps/skill3-1-web-component-auth`, :3005)
 
 1. **로그인 전**: BFF 위젯 `401`, Bridge 위젯 "로그인 필요"
-2. 로그인 후:
-   - **BFF 위젯**: `fetch("/bff/cost-saving/projects", { credentials: "include" })` → Mother App BFF가 포털 토큰을 붙여 업무 API 호출 (토큰이 브라우저 JS에 노출되지 않음)
+2. 로그인 후 (데이터 출처는 :3005의 자기 API `/api/projects`):
+   - **BFF 위젯**: `fetch("/bff/cost-saving/projects", { credentials: "include" })` → Mother App BFF가 포털 토큰을 붙여 :3005 자기 API로 프록시 (토큰이 브라우저 JS에 노출되지 않음)
    - **Bridge 위젯**: Mother App이 property로 주입한 `portalAuth.getUser()` / `portalAuth.fetch()` 사용
 
 ## 문서 보안 정책 반영 사항
@@ -122,7 +140,8 @@ npm run e2e     # 스크린샷: e2e/shots/
 - token/userId를 query string이나 attribute로 전달하지 않음 — httpOnly 쿠키 + BFF/Bridge 경유
 - iframe `sandbox` 속성은 manifest 선언값 사용
 - `status: "disabled"` 앱/위젯은 렌더링하지 않음
-- 기능별 권한(403)은 항상 Sub App backend가 최종 검증
+- 기능별 권한(403)은 항상 Sub App의 자기 API가 최종 검증
+- Web Component는 Shadow DOM으로 전역 CSS 오염 방지, React 런타임은 위젯 번들에 격리
 
 ## 참고 (데모 한계)
 

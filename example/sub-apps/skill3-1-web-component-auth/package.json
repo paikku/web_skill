@@ -2,7 +2,10 @@
   "name": "skill3-1-web-component-auth",
   "private": true,
   "scripts": {
+    "build:widgets": "node build-widgets.mjs",
+    "predev": "node build-widgets.mjs",
     "dev": "next dev -p 3005",
+    "prebuild": "node build-widgets.mjs",
     "build": "next build",
     "start": "next start -p 3005"
   },
@@ -15,6 +18,7 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.24.0",
     "typescript": "^5"
   }
 }

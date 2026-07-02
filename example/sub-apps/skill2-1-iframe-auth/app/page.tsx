@@ -1,9 +1,7 @@
-import { getToken, getUser } from "@/lib/auth";
-import { SSO_BASE_URL } from "@/lib/config";
+import { getUser } from "@/lib/auth";
+import { getPermissions, listProjects } from "@/lib/data";
 import { LoginGate } from "@/components/LoginGate";
 import { ProjectsApp } from "@/components/ProjectsApp";
-
-type Project = { id: number; title: string; saving: number; owner: string };
 
 export default async function Page() {
   const user = await getUser();
@@ -12,22 +10,9 @@ export default async function Page() {
     return <LoginGate />;
   }
 
-  const token = await getToken();
-  const [projectsRes, permsRes] = await Promise.all([
-    fetch(`${SSO_BASE_URL}/api/cost-saving/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    }),
-    fetch(`${SSO_BASE_URL}/api/cost-saving/my-permissions`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    }),
-  ]);
-
-  const projects: Project[] = projectsRes.ok ? await projectsRes.json() : [];
-  const permissions: string[] = permsRes.ok
-    ? (await permsRes.json()).permissions
-    : [];
+  // 데이터/권한은 SSO가 아니라 이 앱의 자기 저장소에서 읽는다 (lib/data).
+  const permissions = getPermissions(user.userId);
+  const projects = permissions.includes("COST_SAVING_VIEW") ? listProjects() : [];
 
   return (
     <ProjectsApp user={user} projects={projects} permissions={permissions} />

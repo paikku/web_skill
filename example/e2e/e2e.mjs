@@ -28,13 +28,27 @@ function check(name, ok, detail = "") {
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 
+// 위젯은 React로 만들어 Shadow DOM에 렌더되므로 shadowRoot.textContent를 읽는다.
+async function shadowText(pg, tag) {
+  return pg.locator(tag).first().evaluate((el) => el.shadowRoot?.textContent ?? "").catch(() => "");
+}
+async function waitShadow(pg, tag, needle, timeout = 15000) {
+  await pg
+    .waitForFunction(
+      ([t, n]) => document.querySelector(t)?.shadowRoot?.textContent?.includes(n),
+      [tag, needle],
+      { timeout }
+    )
+    .catch(() => {});
+  return shadowText(pg, tag);
+}
+
 // ---- 1. 로그인 전 대시보드: 공개 위젯(skill3) OK, 인증 위젯(skill3-1) 401 ----
 await page.goto("http://localhost:3000/");
-await page.waitForTimeout(3000);
+const kpiVisible = await waitShadow(page, "factory-kpi-card", "가동률");
+const bffText = await waitShadow(page, "cost-saving-secure-widget", "401");
 await page.screenshot({ path: `${SHOTS}/01-dashboard-logged-out.png`, fullPage: true });
-const kpiVisible = await page.locator("factory-kpi-card").innerText().catch(() => "");
-check("[3] 공개 위젯(:3004) 로그인 전 표시", kpiVisible.includes("가동률"));
-const bffText = await page.locator("cost-saving-secure-widget").innerText().catch(() => "");
+check("[3] 공개 위젯(:3004) 로그인 전 표시 (React+자기API)", kpiVisible.includes("가동률"));
 check("[3-1] BFF 위젯(:3005) 로그인 전 401", bffText.includes("401"), bffText.slice(0, 50).replace(/\n/g, " "));
 
 // ---- 2. Skill Matrix: 옵션별 앱 5개가 대각선으로 표시 ----
@@ -64,14 +78,13 @@ await page.waitForURL(/localhost:8000\/authorize/);
 await page.screenshot({ path: `${SHOTS}/05-sso-login-page.png` });
 await page.click('button[value="user-kim"]');
 await page.waitForURL("http://localhost:3000/");
-await page.waitForTimeout(3000);
-await page.screenshot({ path: `${SHOTS}/06-dashboard-logged-in.png`, fullPage: true });
 const header = await page.locator(".user-box").innerText();
 check("포털 SSO 로그인 (김철수)", header.includes("김철수"));
-const bffAfter = await page.locator("cost-saving-secure-widget").innerText().catch(() => "");
-check("[3-1] BFF 위젯 데이터 표시", bffAfter.includes("건"), bffAfter.split("\n")[1] ?? "");
-const bridgeAfter = await page.locator("cost-saving-bridge-widget").innerText().catch(() => "");
-check("[3-1] Auth Bridge 위젯 사용자 표시", bridgeAfter.includes("김철수"), bridgeAfter.split("\n")[1] ?? "");
+const bffAfter = await waitShadow(page, "cost-saving-secure-widget", "건");
+check("[3-1] BFF 위젯 데이터 표시 (자기API via BFF)", bffAfter.includes("건"), bffAfter.replace(/\s+/g, " ").slice(0, 40));
+const bridgeAfter = await waitShadow(page, "cost-saving-bridge-widget", "김철수");
+check("[3-1] Auth Bridge 위젯 사용자 표시", bridgeAfter.includes("김철수"), bridgeAfter.replace(/\s+/g, " ").slice(0, 40));
+await page.screenshot({ path: `${SHOTS}/06-dashboard-logged-in.png`, fullPage: true });
 
 // ---- 6. iframe 탭(:3003) same-sso 자동 로그인 + sessionCheck ----
 await page.goto("http://localhost:3000/apps/cost-saving");
@@ -88,8 +101,10 @@ check("[2-1] sessionCheckUrl CORS 조회", sessionJson.includes('"authenticated"
 await page.goto("http://localhost:3001/");
 await page.locator("a.btn", { hasText: "중앙 SSO로 로그인" }).click();
 await page.waitForSelector("table", { timeout: 15000 });
+await page.waitForFunction(() => document.body.innerText.includes("합계"), null, { timeout: 15000 }).catch(() => {});
 const claims = await page.locator(".card").innerText();
 check("[1] standalone-sso 직접 접속 (로그인 화면 생략)", claims.includes("김철수"));
+check("[1] 경비 내역을 자기 API(/api/expenses)로 표시", claims.includes("KTX") && claims.includes("합계"));
 await page.screenshot({ path: `${SHOTS}/08-skill1-direct.png` });
 
 // ---- 8. Skill 2-1 앱(:3003) 직접 접속 + 김철수 과제 등록 성공 ----

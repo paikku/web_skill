@@ -1,38 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "@/lib/auth";
-import { SSO_BASE_URL } from "@/lib/config";
+import { getUser } from "@/lib/auth";
+import { createProject, hasPermission, listProjects } from "@/lib/data";
 
-// Sub App 화면이 자기 backend(FastAPI)를 호출할 때 쓰는 프록시.
-// httpOnly 쿠키의 토큰을 서버에서 Bearer로 바꿔 붙인다 (토큰이 JS에 노출되지 않음).
-async function proxy(req: NextRequest, method: "GET" | "POST") {
-  const token = await getToken();
-  if (!token) {
+// 원가절감 앱의 "자기 API". 데이터도 권한 검증도 여기서 한다 (SSO 아님).
+// 이 API는 이 앱 프론트가 same-origin 쿠키로 호출한다.
+//   GET  : COST_SAVING_VIEW 필요
+//   POST : COST_SAVING_EDIT 필요 (프론트에서 버튼을 숨겨도 최종 검증은 여기)
+export async function GET() {
+  const user = await getUser();
+  if (!user) {
     return NextResponse.json(
       { code: "UNAUTHENTICATED", message: "로그인이 필요합니다." },
       { status: 401 }
     );
   }
-
-  const upstream = await fetch(`${SSO_BASE_URL}/api/cost-saving/projects`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: method === "GET" ? undefined : await req.text(),
-    cache: "no-store",
-  });
-
-  return new NextResponse(await upstream.text(), {
-    status: upstream.status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-export async function GET(req: NextRequest) {
-  return proxy(req, "GET");
+  if (!hasPermission(user.userId, "COST_SAVING_VIEW")) {
+    return NextResponse.json(
+      { code: "FORBIDDEN", message: "COST_SAVING_VIEW 권한이 없습니다." },
+      { status: 403 }
+    );
+  }
+  return NextResponse.json(listProjects());
 }
 
 export async function POST(req: NextRequest) {
-  return proxy(req, "POST");
+  const user = await getUser();
+  if (!user) {
+    return NextResponse.json(
+      { code: "UNAUTHENTICATED", message: "로그인이 필요합니다." },
+      { status: 401 }
+    );
+  }
+  if (!hasPermission(user.userId, "COST_SAVING_EDIT")) {
+    return NextResponse.json(
+      { code: "FORBIDDEN", message: "COST_SAVING_EDIT 권한이 없습니다." },
+      { status: 403 }
+    );
+  }
+  const body = await req.json().catch(() => ({}));
+  const project = createProject({
+    title: String(body.title ?? ""),
+    saving: Number(body.saving ?? 0),
+    owner: user.userId,
+  });
+  return NextResponse.json(project);
 }

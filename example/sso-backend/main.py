@@ -1,12 +1,15 @@
 """
-가짜 중앙 SSO + Sub App(원가절감) 업무 API.
+가짜 중앙 SSO (Identity Provider) — 인증만 담당한다.
 
-하나의 FastAPI 프로세스가 데모 편의상 2개 역할을 겸한다.
+  중앙 SSO (OIDC 흉내) : /authorize /token /userinfo /logout
 
-  1. 중앙 SSO (OIDC 흉내) : /authorize /token /userinfo /logout
-  2. 원가절감 업무 API     : /api/cost-saving/*  (Bearer 검증 + 기능별 권한 체크)
+원칙: 이 서버는 "누구인가(identity)"만 책임진다.
+  - 업무 데이터(과제/경비/KPI)와 기능별 권한(authorization)은 각 Sub App이
+    자기 API로 직접 관리한다. 여기에는 어떤 업무 API도 없다.
+  - Sub App들은 발급받은 access token을 /userinfo 로 introspection 하여
+    사용자를 확인한 뒤, 자기 DB(데모에선 in-memory)에서 데이터를 그린다.
 
-화면(iframe 탭)과 위젯 호스팅은 각 Sub App(Next.js)이 담당한다 — sub-apps/ 참고.
+화면(iframe 탭)과 위젯 호스팅도 각 Sub App(Next.js)이 담당한다 — sub-apps/ 참고.
 """
 
 from __future__ import annotations  # Python 3.10 미만에서도 `dict | None` 표기 허용
@@ -19,7 +22,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-app = FastAPI(title="Fake Central SSO + Sub App Backend")
+app = FastAPI(title="Fake Central SSO (Identity Provider only)")
 
 PORTAL_ORIGIN = "http://localhost:3000"
 
@@ -52,23 +55,12 @@ USERS = {
     },
 }
 
-# 기능별 권한은 Sub App DB가 관리한다 (문서 원칙: Token = identity, DB = 권한)
-COST_SAVING_PERMISSIONS = {
-    "user-kim": ["COST_SAVING_VIEW", "COST_SAVING_EDIT"],
-    "user-lee": ["COST_SAVING_VIEW"],
-}
-
+# 기능별 권한/업무 데이터는 여기에 두지 않는다 — 각 Sub App이 자기 API에서 관리한다.
 REGISTERED_CLIENTS = {
     "mother-portal": {"redirect_uris": ["http://localhost:3000/auth/callback"]},
     "expense-app": {"redirect_uris": ["http://localhost:3001/auth/callback"]},
     "cost-saving-app": {"redirect_uris": ["http://localhost:3003/auth/callback"]},
 }
-
-PROJECTS = [
-    {"id": 1, "title": "라인 A 전력 절감", "saving": 12000000, "owner": "user-kim"},
-    {"id": 2, "title": "포장재 단가 협상", "saving": 8500000, "owner": "user-lee"},
-    {"id": 3, "title": "물류 경로 최적화", "saving": 4300000, "owner": "user-kim"},
-]
 
 SSO_SESSIONS: dict[str, dict] = {}   # sso_session cookie -> {user_id}
 AUTH_CODES: dict[str, dict] = {}     # code -> {user_id, client_id, redirect_uri, exp}
@@ -244,63 +236,3 @@ def logout(request: Request, redirect_uri: str = PORTAL_ORIGIN):
     response = RedirectResponse(redirect_uri, status_code=302)
     response.delete_cookie("sso_session")
     return response
-
-
-# ---------------------------------------------------------------------------
-# 2. 원가절감 업무 API (Sub App backend 역할)
-# ---------------------------------------------------------------------------
-
-def _require_auth(request: Request):
-    user = _resolve_token(request)
-    if not user:
-        return None, JSONResponse(
-            {"code": "UNAUTHENTICATED", "message": "로그인이 필요합니다."}, status_code=401
-        )
-    return user, None
-
-
-def _require_permission(user: dict, permission: str):
-    if permission not in COST_SAVING_PERMISSIONS.get(user["sub"], []):
-        return JSONResponse(
-            {"code": "FORBIDDEN", "message": f"{permission} 권한이 없습니다."},
-            status_code=403,
-        )
-    return None
-
-
-@app.get("/api/cost-saving/projects")
-def list_projects(request: Request):
-    user, err = _require_auth(request)
-    if err:
-        return err
-    err = _require_permission(user, "COST_SAVING_VIEW")
-    if err:
-        return err
-    return PROJECTS
-
-
-@app.post("/api/cost-saving/projects")
-async def create_project(request: Request):
-    user, err = _require_auth(request)
-    if err:
-        return err
-    err = _require_permission(user, "COST_SAVING_EDIT")
-    if err:
-        return err
-    body = await request.json()
-    project = {
-        "id": max((p["id"] for p in PROJECTS), default=0) + 1,
-        "title": str(body.get("title", "")).strip() or "제목 없음",
-        "saving": int(body.get("saving", 0)),
-        "owner": user["sub"],
-    }
-    PROJECTS.append(project)
-    return project
-
-
-@app.get("/api/cost-saving/my-permissions")
-def my_permissions(request: Request):
-    user, err = _require_auth(request)
-    if err:
-        return err
-    return {"userId": user["sub"], "permissions": COST_SAVING_PERMISSIONS.get(user["sub"], [])}

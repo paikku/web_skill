@@ -4,6 +4,8 @@ next-env.d.ts
 *.tsbuildinfo
 __pycache__/
 example/e2e/shots/
+# 위젯 번들은 build-widgets.mjs(esbuild)로 생성됨 (predev/prebuild)
+example/sub-apps/*/public/widgets/
 .venv/
 venv/
 .DS_Store
